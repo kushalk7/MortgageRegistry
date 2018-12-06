@@ -120,9 +120,75 @@ class NewLoan(tk.Frame):
                            command=lambda: Lookup(self, self.setCustomer))
         self.lookupBtn.grid(row=0)
         self.cust = None
+        
+        r = 1
+        c = 1
+        tk.Label(self, text="Name").grid(row=r)
+        self.nameEt = tk.Entry(self)
+        self.nameEt.grid(row=r, column=c, sticky="ew")
 
+        r = r + 1
+
+        tk.Label(self, text="Address/City").grid(row=r)
+        self.addressEt = tk.Entry(self)
+        self.addressEt.grid(row=r, column=c, sticky="ew")
+
+        r = r + 1
+
+        tk.Label(self, text="Phone").grid(row=r)
+        self.phoneEt = tk.Entry(self)
+        self.phoneEt.grid(row=r, column=c, sticky="ew")
+
+        r = r + 1
+
+        tk.Label(self, text="Date").grid(row=r)
+        self.dateEt = tk.Entry(self)
+        self.dateEt.grid(row=r, column=c, sticky="ew")
+        
+        r = r + 1
+
+        tk.Label(self, text="Amount").grid(row=r)
+        self.amtEt = tk.Entry(self)
+        self.amtEt.grid(row=r, column=c, sticky="ew")
+
+        r = r + 1
+
+        tk.Label(self, text="Item/s").grid(row=r)
+        self.itemEt = tk.Entry(self)
+        self.itemEt.grid(row=r, column=c, sticky="ew")
+
+        r = r + 1
+
+        self.savebtn = tk.Button(self, text='Save', width=25,
+                           command=lambda: self.save(), state=tk.DISABLED)
+        self.savebtn.grid(row=r)
+
+        self.amtEt.focus_set()
+
+    def save(self):
+        ln = loan(self.amtEt.get(),
+                        self.itemEt.get(), self.dateEt.get(), self.cust)
+        db.saveLoan(ln)
+        print(f"Saved successfully: \n {ln}")
+        self.nameEt.delete(0, 'end')
+        self.addressEt.delete(0, 'end')
+        self.phoneEt.delete(0, 'end')
+        self.dateEt.delete(0, 'end')
+        self.amtEt.delete(0, 'end')
+        self.itemEt.delete(0, 'end')
+
+
+    # Callback function to lookup customer
     def setCustomer(self, cust):
-        self.cust = cust
+        self.cust = customer(cust['Name'], cust['Address'], cust['Phone'])
+        self.cust.id = cust['ID']
+        self.nameEt.insert(0, self.cust.name)
+        self.addressEt.insert(0, self.cust.address)
+        self.phoneEt.insert(0, self.cust.phone)
+        # self.nameEt.config(state = "readonly")
+        # self.addressEt.config(state = "readonly")
+        # self.phoneEt.config(state = "readonly")
+        self.savebtn.config(state = tk.NORMAL)
         print(f"Customer: \n {self.cust} ")
 
 
@@ -157,7 +223,7 @@ class Lookup(tkSimpleDialog.Dialog):
         # self.searchTbl.grid(row=r)
         # self.searchTbl.show()
         for i in range(r):
-            self.grid_rowconfigure(i, weight=1)
+            # self.grid_rowconfigure(i, weight=1)
             self.grid_columnconfigure(i, weight=1)
 
         return self.nameEt
@@ -175,7 +241,10 @@ class Lookup(tkSimpleDialog.Dialog):
         value=widget.model.getRecordAtRow(widget.getSelectedRow())
         print ("selection:: '%s'" % value)
         self.callback(value)
-        self.destroy()
+        self.searchTbl.destroy()
+        self.f1.destroy()
+        self.cancel()
+        # self.destroy()
         return value
     
     def searchCustomer(self):
@@ -223,30 +292,33 @@ class Search(tk.Frame):
         button.grid(row=r)
 
         r = r + 1
-
-        self.yScroll = tk.Scrollbar(self, orient=tk.VERTICAL)
-        self.yScroll.grid(row=r, column=1, sticky=tk.N+tk.S)
-        self.xScroll = tk.Scrollbar(self, orient=tk.HORIZONTAL)
-        self.xScroll.grid(row=r+1, column=0, sticky=tk.E+tk.W)
-        self.searchlist = tk.Listbox(self,
-                                        xscrollcommand=self.xScroll.set,
-                                        yscrollcommand=self.yScroll.set)
-        self.searchlist.grid(row=r, sticky="nsew", columnspan=3)
-        self.xScroll['command'] = self.searchlist.xview
-        self.yScroll['command'] = self.searchlist.yview
-        # self.searchlist = tk.Listbox(self)
-        # self.searchlist.grid(row=r, sticky="nsew", columnspan=3)
-
+        f = tk.Frame(self)
+        self.f1 = tk.Frame(f)
+        f.grid(row=r, column=0, columnspan=10, sticky="nsew")
+        self.f1.pack()
+        
         for i in range(r):
-            self.grid_rowconfigure(i, weight=1)
+            # self.grid_rowconfigure(i, weight=1)
             self.grid_columnconfigure(i, weight=1)
         
     def searchLoan(self):
-        res = db.searchLoan(self.nameEt.get(), self.addressEt.get(),
-                        datetime.datetime.strptime(self.dateEt.get(), '%d-%m-%Y').date())
-        for l in res:
-            self.searchlist.insert(tk.END, l)
-
+        res = db.searchLoan(self.nameEt.get(), self.addressEt.get(), self.dateEt.get())
+                        # datetime.datetime.strptime(self.dateEt.get(), '%d-%m-%Y').date())
+        # ID, amt, items, date, cust_id
+        data = {}
+        col = ['ID', 'Name', 'Phone', 'Address', 'Date', 'Amt', 'Items']
+        
+        for i, l in enumerate(res):
+            cust = db.getCustomer(l[4]) # id, name, phone, add
+            val = [l[0], cust[1], cust[2], cust[3], l[3], l[1], l[2]]
+            data[i] = {c[0]:c[1] for c in zip(col, val)}
+        if data:
+            self.searchTbl = TableCanvas(self.f1, editable = False, data=data)
+            # self.searchTbl.bind("<Double-Button-1>", self.OnDouble)
+            # self.searchTbl.model.importDict(data) 
+            # print (self.searchTbl.model.columnNames)
+            # self.searchTbl.redraw()
+            self.searchTbl.show()
 
 if __name__ == "__main__":
     app = MortgageUI()
@@ -266,3 +338,15 @@ if __name__ == "__main__":
         # self.xScroll['command'] = self.searchlist.xview
         # self.yScroll['command'] = self.searchlist.yview
         # self.searchlist.bind("<Double-Button-1>", self.OnDouble)
+
+
+        # self.yScroll = tk.Scrollbar(self, orient=tk.VERTICAL)
+        # self.yScroll.grid(row=r, column=1, sticky=tk.N+tk.S)
+        # self.xScroll = tk.Scrollbar(self, orient=tk.HORIZONTAL)
+        # self.xScroll.grid(row=r+1, column=0, sticky=tk.E+tk.W)
+        # self.searchlist = tk.Listbox(self,
+        #                                 xscrollcommand=self.xScroll.set,
+        #                                 yscrollcommand=self.yScroll.set)
+        # self.searchlist.grid(row=r, sticky="nsew", columnspan=3)
+        # self.xScroll['command'] = self.searchlist.xview
+        # self.yScroll['command'] = self.searchlist.yview
